@@ -1,8 +1,4 @@
-.App {
-  text-align: center;
-}
-
-.App-header {
+.Header {
   background-color: yellowgreen;
   min-height: 10vh;
   display: flex;
@@ -11,4 +7,12 @@
   justify-content: center;
   font-size: calc(10px + 1.4vmin);
   color: white;
+}
+
+.Header h1 {
+  margin: 0.4rem 1rem 0.2rem;
+}
+
+.Header .user {
+  margin-bottom: 0.6rem;
 }

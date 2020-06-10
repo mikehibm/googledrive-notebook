@@ -1,0 +1,11 @@
+.FileContent textarea {
+  width: 90%;
+}
+
+.FileContent .buttons {
+  padding: 0.4rem 1rem;
+}
+
+.FileContent .buttons button {
+  margin: 0.4rem 1rem;
+}
