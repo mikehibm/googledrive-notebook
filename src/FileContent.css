@@ -1,3 +1,29 @@
+.FileContent button {
+  background-color: #fefefe;
+  border-radius: 0.4rem;
+  border: 1px solid #888;
+  cursor: pointer;
+}
+
+.FileContent-header {
+  width: 90%;
+  margin: 1rem auto 0;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  column-gap: 1rem;
+  justify-content: center;
+  align-items: center;
+}
+.FileContent-header .filename {
+  margin: 0.8rem 0 0.4rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: left;
+}
+.FileContent-header button {
+  height: 2rem;
+}
+
 .FileContent textarea {
   width: 90%;
 }
@@ -8,4 +34,9 @@
 
 .FileContent .buttons button {
   margin: 0.4rem 1rem;
+  font-size: 200%;
+  color: blue;
+}
+.FileContent .buttons button[disabled] {
+  color: #aaa;
 }

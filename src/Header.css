@@ -16,3 +16,10 @@
 .Header .user {
   margin-bottom: 0.6rem;
 }
+
+.Header button {
+  background-color: #fefefe;
+  border-radius: 0.4rem;
+  border: 1px solid #888;
+  cursor: pointer;
+}

@@ -1,19 +1,28 @@
 /* eslint-disable no-undef */
 
+const DISCOVERY_DOCS = [
+  'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
+];
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
+const UPLOAD_PARAMS = '?uploadType=multipart&fields=id';
+const APP_FOLDER = 'Notebook-dev2020';
+
+// apiKey and clientId are defined in index.html
+const initConfig = {
+  apiKey: GOOGLE_API_KEY,
+  clientId: GOOGLE_CLIENT_ID,
+  discoveryDocs: DISCOVERY_DOCS,
+  scope: SCOPES,
+};
+
 export async function init(onInit) {
-  const gapi = window.gapi;
   if (!gapi) return;
 
   gapi.load('client:auth2', initClient);
 
   async function initClient() {
-    const initConfig = {
-      apiKey: GOOGLE_API_KEY,
-      clientId: GOOGLE_CLIENT_ID,
-      discoveryDocs: DISCOVERY_DOCS,
-      scope: SCOPES,
-    };
-
     try {
       await gapi.client.init(initConfig);
 
@@ -33,56 +42,141 @@ export async function signOut() {
   return gapi.auth2.getAuthInstance().signOut();
 }
 
-export async function getFiles() {
-  return gapi.client.drive.files
-    .list({
-      pageSize: 100,
-      fields: 'nextPageToken, files(id, name)',
-    })
-    .then(function (response) {
-      return response.result.files;
-    });
+async function getFolders(folderName) {
+  const response = await gapi.client.drive.files.list({
+    q: `mimeType = 'application/vnd.google-apps.folder' and name = '${folderName}' and trashed = false`,
+    pageSize: 100,
+    fields: 'nextPageToken, files(id, name)',
+  });
+  return response?.result?.files;
 }
 
-export async function uploadFile(filename = 'tempdata', content = '') {
+async function findOrCreateFolderId(folderName) {
+  const folders = await getFolders(folderName);
+  let folderId = folders[0]?.id;
+  console.log(`Folder '${folderName}' id=${folderId}`);
+
+  if (!folderId) {
+    console.log(`Folder '${folderName}' not found. Creating...`);
+    folderId = await createFolder(folderName);
+    console.log(`Folder '${folderName}' created. id=${folderId}`);
+  }
+  return folderId;
+}
+
+async function createFolder(folderName) {
+  const metadata = {
+    name: folderName,
+    mimeType: 'application/vnd.google-apps.folder',
+  };
+
+  const response = await gapi.client.drive.files.create({
+    resource: metadata,
+    fields: 'id',
+  });
+
+  console.log('createFolder', response);
+  return response.result.id;
+}
+
+export async function getFiles() {
+  let parentFolderId = await findOrCreateFolderId(APP_FOLDER);
+
+  const params = {
+    q: `mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
+    pageSize: 100,
+    fields: 'nextPageToken, files(id, name)',
+  };
+
+  if (parentFolderId) {
+    params['q'] = params['q'] + ` and '${parentFolderId}' in parents`;
+  }
+
+  const response = await gapi.client.drive.files.list(params);
+  return response.result.files;
+}
+
+export async function getFileInfo(fileId) {
+  if (!fileId) return;
+
+  const params = {
+    fileId,
+    fields: 'id,name,createdTime,modifiedTime,webContentLink',
+  };
+  const response = await gapi.client.drive.files.get(params);
+  console.log('getFileContent', response);
+  return response.result;
+}
+
+export async function getFileContent(fileId) {
+  if (!fileId) return { fileId: '', name: 'New File', content: '' };
+
+  const accessToken = gapi.auth.getToken().access_token;
+  const info = await getFileInfo(fileId);
+  // const url = info.webContentLink;   // webContentLink didn't work because of CORS restriction.
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&source=downloadUrl`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: new Headers({ Authorization: 'Bearer ' + accessToken }),
+  });
+
+  const content = await response.text();
+  return { fileId, name: info.name, content };
+}
+
+export async function uploadFile({
+  fileId = '',
+  fileName = 'New File',
+  content = '',
+}) {
   console.log('Uploading...');
 
-  const id = ''; //'1swKOjaOguzsH5jdfWjE35d-UWtNcpaQ0';
-  var data = {
-    content,
-    name: 'Mike 3333',
-    accounts: [
-      { id: 1, name: 'Account 1', data: ['aaaa', 'bbb'] },
-      { id: 2, name: 'Account-2' },
-      { id: 3, name: 'Account-3', data: [123, 4324, 55, 666, 7777, 888] },
-    ],
-  };
-  var file = new Blob([JSON.stringify(data)], {
-    type: 'application/json',
-  });
-  var metadata = {
-    name: filename, // Filename at Google Drive
-    mimeType: 'application/json', // mimeType at Google Drive
-    //parents: ['### folder ID ###'], // Folder ID at Google Drive
-  };
+  if (!fileName.endsWith('.txt')) fileName = fileName + '.txt';
 
-  var accessToken = gapi.auth.getToken().access_token; // Here gapi is used for retrieving the access token.
-  var form = new FormData();
+  let parentFolderId = await findOrCreateFolderId(APP_FOLDER);
+
+  const file = new Blob([content], { type: 'text/plain' });
+  const metadata = {
+    name: fileName,
+    mimeType: 'text/plain',
+  };
+  if (parentFolderId && !fileId) {
+    metadata['parents'] = [parentFolderId];
+  }
+
+  const accessToken = gapi.auth.getToken().access_token;
+  const form = new FormData();
   form.append(
     'metadata',
     new Blob([JSON.stringify(metadata)], { type: 'application/json' })
   );
   form.append('file', file);
 
-  return fetch(UPLOAD_URL + '/' + id + UPLOAD_PARAMS, {
-    method: id ? 'PATCH' : 'POST',
+  const url = UPLOAD_URL + (fileId ? '/' + fileId : '') + UPLOAD_PARAMS;
+
+  const res = await fetch(url, {
+    method: fileId ? 'PATCH' : 'POST',
     headers: new Headers({ Authorization: 'Bearer ' + accessToken }),
     body: form,
-  })
-    .then((res) => {
-      return res.json();
-    })
-    .then(function (fileId) {
-      console.log('UPLOADED:', fileId);
-    });
+  });
+  const uploadedFileId = await res.json();
+  return uploadedFileId;
+}
+
+export async function deleteFile(fileId) {
+  if (!fileId) return { fileId: '', name: 'New File', content: '' };
+
+  const accessToken = gapi.auth.getToken().access_token;
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}`;
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: new Headers({ Authorization: 'Bearer ' + accessToken }),
+  });
+  if (response.ok) {
+    return { fileId };
+  } else {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
 }

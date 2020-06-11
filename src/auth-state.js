@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import React, { createContext, useReducer, useEffect } from 'react';
 import { init, signIn, signOut } from './google-api';
 
@@ -55,7 +54,7 @@ export function AuthProvider({ children }) {
       if (user && user.isSignedIn()) {
         dispatch({ type: 'SIGN_IN', payload: { user } });
       } else {
-        dispatch({ type: 'SIGN_OUT', payload: {} });
+        dispatch({ type: 'SIGN_OUT' });
       }
     });
   }, []);
@@ -82,7 +81,7 @@ export function useAuthState() {
     },
     signOut: async () => {
       await signOut();
-      dispatch({ type: 'SIGN_OUT', payload: {} });
+      dispatch({ type: 'SIGN_OUT' });
     },
   };
 

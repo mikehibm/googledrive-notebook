@@ -1,6 +1,5 @@
-import React, { createContext, useReducer, useEffect } from 'react';
-import { getFiles } from './google-api';
-import { useAuthState } from './auth-state';
+import React, { createContext, useReducer } from 'react';
+import { getFiles, uploadFile, deleteFile } from './google-api';
 
 const AppStateContext = createContext();
 const AppDispatchContext = createContext();
@@ -9,10 +8,39 @@ function appReducer(state, action) {
   console.log('appReducer', state, action);
 
   switch (action.type) {
-    case 'LOAD_FILES': {
+    case 'LOAD_FILES_BEGIN': {
       return {
         ...state,
+        loading: true,
+        error: null,
+      };
+    }
+    case 'LOAD_FILES_END': {
+      return {
+        ...state,
+        loading: false,
+        error: null,
         files: [...action.payload.files],
+      };
+    }
+    case 'LOAD_FILES_ERROR': {
+      return {
+        ...state,
+        loading: false,
+        error: action.payload.error,
+      };
+    }
+    case 'CLEAR_FILES': {
+      return {
+        ...state,
+        files: [],
+        selectedFileId: null,
+      };
+    }
+    case 'SELECT_FILE': {
+      return {
+        ...state,
+        selectedFileId: action.payload.fileId,
       };
     }
     default: {
@@ -24,15 +52,10 @@ function appReducer(state, action) {
 export function AppStateProvider({ children }) {
   const [appState, dispatch] = useReducer(appReducer, {
     files: [],
+    selectedFileId: null,
+    loading: undefined,
+    error: null,
   });
-
-  const [authState] = useAuthState();
-
-  useEffect(() => {
-    if (authState.isSignedIn === true && appState.files.length === 0) {
-      loadFiles(dispatch);
-    }
-  }, [authState.isSignedIn, appState.files.length]);
 
   return (
     <AppStateContext.Provider value={appState}>
@@ -41,11 +64,6 @@ export function AppStateProvider({ children }) {
       </AppDispatchContext.Provider>
     </AppStateContext.Provider>
   );
-}
-
-async function loadFiles(dispatch) {
-  const files = await getFiles();
-  dispatch({ type: 'LOAD_FILES', payload: { files } });
 }
 
 export function useAppState() {
@@ -64,8 +82,54 @@ export function useAppActions() {
   }
 
   return {
-    loadFiles: () => {
-      loadFiles(dispatch);
+    loadFiles: async () => {
+      dispatch({ type: 'LOAD_FILES_BEGIN' });
+
+      try {
+        const files = await getFiles();
+        dispatch({ type: 'LOAD_FILES_END', payload: { files } });
+      } catch (error) {
+        dispatch({ type: 'LOAD_FILES_ERROR', payload: { error } });
+      }
+    },
+    clearFiles: async () => {
+      dispatch({ type: 'CLEAR_FILES' });
+    },
+    uploadFile: async ({ fileId, fileName, content }) => {
+      dispatch({ type: 'LOAD_FILES_BEGIN' });
+
+      try {
+        const { id: uploadedFileId } = await uploadFile({
+          fileId,
+          fileName,
+          content,
+        });
+        console.log('uploadFile() done:', uploadedFileId);
+
+        const files = await getFiles();
+        dispatch({ type: 'LOAD_FILES_END', payload: { files } });
+        return uploadedFileId;
+      } catch (error) {
+        dispatch({ type: 'LOAD_FILES_ERROR', payload: { error } });
+      }
+    },
+
+    selectFile: (fileId) => {
+      dispatch({ type: 'SELECT_FILE', payload: { fileId } });
+    },
+
+    deleteFile: async (fileId) => {
+      dispatch({ type: 'LOAD_FILES_BEGIN' });
+
+      try {
+        await deleteFile(fileId);
+        dispatch({ type: 'SELECT_FILE', payload: { fileId: null } });
+
+        const files = await getFiles();
+        dispatch({ type: 'LOAD_FILES_END', payload: { files } });
+      } catch (error) {
+        dispatch({ type: 'LOAD_FILES_ERROR', payload: { error } });
+      }
     },
   };
 }
