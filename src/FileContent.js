@@ -1,14 +1,49 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useReducer, useRef } from 'react';
 import { useAuthState } from './auth-state';
 import { useAppActions, useAppState } from './app-state';
 import { getFileContent } from './google-api';
 import './FileContent.css';
 
+function reducer(state, action) {
+  switch (action.type) {
+    case 'LOAD_FILE': {
+      return {
+        ...state,
+        fileName: action.payload.fileName,
+        content: action.payload.content,
+        loading: false,
+      };
+    }
+    case 'SET_FILENAME': {
+      return {
+        ...state,
+        fileName: action.payload.fileName,
+      };
+    }
+    case 'SET_CONTENT': {
+      return {
+        ...state,
+        content: action.payload.content,
+      };
+    }
+    case 'SET_LOADING': {
+      return {
+        ...state,
+        loading: action.payload.loading,
+      };
+    }
+    default:
+      throw new Error(`Invalid action type '${action.type}'`);
+  }
+}
+
 export function FileContent() {
-  const [fileId, setFileId] = useState('');
-  const [fileName, setFilename] = useState('');
-  const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(undefined);
+  const [state, dispatch] = useReducer(reducer, {
+    fileName: '',
+    content: '',
+    loading: undefined,
+  });
+  const { fileName, content, loading } = state;
 
   const [authState] = useAuthState();
   const { isSignedIn } = authState;
@@ -18,20 +53,22 @@ export function FileContent() {
   const { selectedFileId } = appState;
 
   const loadContent = useCallback(async () => {
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: { loading: true } });
+
     const data = await getFileContent(selectedFileId);
-    console.log('getFileContent -> data', data);
-    setFileId(data.fileId);
-    setFilename(data.name);
-    setContent(data.content);
-    setLoading(false);
+
+    dispatch({
+      type: 'LOAD_FILE',
+      payload: {
+        fileName: data.name,
+        content: data.content,
+      },
+    });
   }, [selectedFileId]);
 
   useEffect(() => {
-    if (selectedFileId !== fileId) {
-      loadContent();
-    }
-  }, [selectedFileId, fileId, loadContent]);
+    loadContent();
+  }, [selectedFileId, loadContent]);
 
   async function handleUpload() {
     const inputFileName = prompt(
@@ -40,21 +77,21 @@ export function FileContent() {
     );
     if (!inputFileName) return;
 
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: { loading: true } });
     const id = await uploadFile({
       fileId: selectedFileId,
       fileName: inputFileName,
       content,
     });
 
-    setFilename(inputFileName);
+    dispatch({ type: 'SET_FILENAME', payload: { fileName: inputFileName } });
+    dispatch({ type: 'SET_LOADING', payload: { loading: false } });
     selectFile(id);
-    setLoading(false);
   }
 
   async function handleReload() {
     if (!selectedFileId) {
-      setContent('');
+      dispatch({ type: 'SET_CONTENT', payload: { content: '' } });
       return;
     }
 
@@ -63,15 +100,19 @@ export function FileContent() {
 
   async function handleDelete() {
     if (!selectedFileId) {
-      setContent('');
+      dispatch({ type: 'SET_CONTENT', payload: { content: '' } });
       return;
     }
     // eslint-disable-next-line no-restricted-globals
     if (!confirm('Are you sure to delete this file?')) return;
 
-    setLoading(true);
+    dispatch({ type: 'SET_LOADING', payload: { loading: true } });
     await deleteFile(selectedFileId);
-    setLoading(false);
+    dispatch({ type: 'SET_LOADING', payload: { loading: false } });
+  }
+
+  function handleChange(e) {
+    dispatch({ type: 'SET_CONTENT', payload: { content: e.target.value } });
   }
 
   if (!isSignedIn) {
@@ -100,11 +141,11 @@ export function FileContent() {
       <textarea
         name="content"
         id="content"
-        cols="30"
-        rows="10"
+        cols={30}
+        rows={10}
         placeholder="テキストを入力してください。"
         value={content}
-        onChange={(e) => setContent(e.target.value)}
+        onChange={handleChange}
         disabled={loading}
       />
 

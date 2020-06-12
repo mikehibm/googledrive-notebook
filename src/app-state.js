@@ -38,6 +38,9 @@ function appReducer(state, action) {
       };
     }
     case 'SELECT_FILE': {
+      if (state.selectedFileId === action.payload.fileId) {
+        return state;
+      }
       return {
         ...state,
         selectedFileId: action.payload.fileId,
