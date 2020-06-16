@@ -1,4 +1,4 @@
-# Google Auth React Example
+# Google Drive Notebook Example
 
 <img src="./public/screen1.png" alt="Screen Shot 1" width="388"/>
 
