@@ -24,7 +24,7 @@
   row-gap: 0.4rem;
 }
 
-.FileList .list div {
+.FileList .list button {
   padding: 0.4rem;
   color: white;
   background-color: #aaf;
@@ -33,13 +33,10 @@
   cursor: pointer;
 }
 
-.FileList .list button {
-  padding: 0.4rem;
+.FileList .list button.btn-new {
   color: #269;
   background-color: #fefefe;
   border: 1px solid #aaa;
-  border-radius: 0.4rem;
-  cursor: pointer;
 }
 
 .FileList .loading {

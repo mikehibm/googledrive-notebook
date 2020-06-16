@@ -47,11 +47,13 @@ export function FileList() {
   return (
     <div className="FileList">
       <div className="list">
-        <button onClick={() => selectFile(null)}>Create new</button>
+        <button onClick={() => selectFile(null)} className="btn-new">
+          Create New
+        </button>
         {files.map((i) => (
-          <div key={i.id} onClick={() => selectFile(i.id)}>
+          <button key={i.id} onClick={() => selectFile(i.id)}>
             {i.name}
-          </div>
+          </button>
         ))}
       </div>
     </div>

@@ -27,12 +27,8 @@ export async function initAuth() {
 
   await new Promise((resolve, reject) => {
     gapi.load('client:auth2', {
-      callback: async () => {
-        resolve();
-      },
-      onerror: () => {
-        reject('Could not load gapi.client.');
-      },
+      callback: resolve,
+      onerror: () => reject('Could not load gapi.client.'),
     });
   });
 
@@ -59,19 +55,6 @@ async function getFolders(folderName) {
   return response?.result?.files;
 }
 
-async function findOrCreateFolderId(folderName) {
-  const folders = await getFolders(folderName);
-  let folderId = folders[0]?.id;
-  console.log(`Folder '${folderName}' id=${folderId}`);
-
-  if (!folderId) {
-    console.log(`Folder '${folderName}' not found. Creating...`);
-    folderId = await createFolder(folderName);
-    console.log(`Folder '${folderName}' created. id=${folderId}`);
-  }
-  return folderId;
-}
-
 async function createFolder(folderName) {
   const metadata = {
     name: folderName,
@@ -83,8 +66,19 @@ async function createFolder(folderName) {
     fields: 'id',
   });
 
-  console.log('createFolder', response);
   return response.result.id;
+}
+
+async function findOrCreateFolderId(folderName) {
+  const folders = await getFolders(folderName);
+  let folderId = folders[0]?.id;
+  console.log(`Folder '${folderName}' id=${folderId}`);
+
+  if (!folderId) {
+    folderId = await createFolder(folderName);
+    console.log(`Folder '${folderName}' created. id=${folderId}`);
+  }
+  return folderId;
 }
 
 export async function getFiles() {
@@ -112,7 +106,6 @@ export async function getFileInfo(fileId) {
     fields: 'id,name,createdTime,modifiedTime,webContentLink',
   };
   const response = await gapi.client.drive.files.get(params);
-  console.log('getFileContent', response);
   return response.result;
 }
 
@@ -138,8 +131,6 @@ export async function uploadFile({
   fileName = 'New File',
   content = '',
 }) {
-  console.log('Uploading...');
-
   if (!fileName.endsWith('.txt')) fileName = fileName + '.txt';
 
   let parentFolderId = await findOrCreateFolderId(APP_FOLDER);
@@ -173,8 +164,6 @@ export async function uploadFile({
 }
 
 export async function deleteFile(fileId) {
-  if (!fileId) return { fileId: '', name: 'New File', content: '' };
-
   const accessToken = gapi.auth.getToken().access_token;
   const url = `https://www.googleapis.com/drive/v3/files/${fileId}`;
 
@@ -182,9 +171,7 @@ export async function deleteFile(fileId) {
     method: 'DELETE',
     headers: new Headers({ Authorization: 'Bearer ' + accessToken }),
   });
-  if (response.ok) {
-    return { fileId };
-  } else {
+  if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
 }
