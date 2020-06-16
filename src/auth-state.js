@@ -1,5 +1,5 @@
 import React, { createContext, useReducer, useEffect } from 'react';
-import { init, signIn, signOut } from './google-api';
+import { initAuth, signIn, signOut } from './google-api';
 
 const AuthStateContext = createContext();
 
@@ -13,9 +13,10 @@ function authReducer(state, action) {
         ...state,
         isSignedIn: true,
         user: user,
-        userName: user.getBasicProfile().getName(),
         userId: user.getId(),
+        userName: user.getBasicProfile().getName(),
         userEmail: user.getBasicProfile().getEmail(),
+        error: null,
       };
     }
     case 'SIGN_OUT': {
@@ -23,9 +24,16 @@ function authReducer(state, action) {
         ...state,
         isSignedIn: false,
         user: null,
-        userName: '',
         userId: '',
+        userName: '',
         userEmail: '',
+        error: null,
+      };
+    }
+    case 'AUTH_ERROR': {
+      return {
+        ...state,
+        error: action.payload.error,
       };
     }
     default: {
@@ -38,25 +46,26 @@ export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, {
     isSignedIn: undefined,
     user: undefined,
-    userName: '',
     userId: '',
+    userName: '',
     userEmail: '',
+    error: null,
   });
 
   useEffect(() => {
-    init((user, error) => {
-      if (error) {
-        console.error(JSON.stringify(error, null, 2));
-        return;
+    (async () => {
+      try {
+        const user = await initAuth();
+        if (user && user.isSignedIn()) {
+          dispatch({ type: 'SIGN_IN', payload: { user } });
+        } else {
+          dispatch({ type: 'SIGN_OUT' });
+        }
+      } catch (error) {
+        console.error(error);
+        dispatch({ type: 'AUTH_ERROR', payload: { error } });
       }
-      console.log('Google API initialized. user=', user);
-
-      if (user && user.isSignedIn()) {
-        dispatch({ type: 'SIGN_IN', payload: { user } });
-      } else {
-        dispatch({ type: 'SIGN_OUT' });
-      }
-    });
+    })();
   }, []);
 
   return (
@@ -69,20 +78,30 @@ export function AuthProvider({ children }) {
 export function useAuthState() {
   const [state, dispatch] = React.useContext(AuthStateContext);
   if (state === undefined) {
-    throw new Error('useAuthState must be used within a AuthStateProvider');
+    throw new Error('useAuthState must be used within AuthProvider');
+  }
+
+  function catchError(func) {
+    return async (...args) => {
+      try {
+        await func(...args);
+      } catch (error) {
+        dispatch({ type: 'AUTH_ERROR', payload: { error } });
+      }
+    };
   }
 
   const actions = {
-    signIn: async () => {
+    signIn: catchError(async () => {
       const user = await signIn();
       if (user && user.isSignedIn()) {
         dispatch({ type: 'SIGN_IN', payload: { user } });
       }
-    },
-    signOut: async () => {
+    }),
+    signOut: catchError(async () => {
       await signOut();
       dispatch({ type: 'SIGN_OUT' });
-    },
+    }),
   };
 
   return [state, actions];

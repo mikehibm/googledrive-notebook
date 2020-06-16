@@ -1,5 +1,8 @@
 /* eslint-disable no-undef */
 
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_CLIENTID;
+const GOOGLE_API_KEY = process.env.REACT_APP_APIKEY;
+
 const DISCOVERY_DOCS = [
   'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
 ];
@@ -17,21 +20,26 @@ const initConfig = {
   scope: SCOPES,
 };
 
-export async function init(onInit) {
-  if (!gapi) return;
-
-  gapi.load('client:auth2', initClient);
-
-  async function initClient() {
-    try {
-      await gapi.client.init(initConfig);
-
-      const user = gapi.auth2.getAuthInstance().currentUser.get();
-      onInit && onInit(user);
-    } catch (error) {
-      onInit && onInit(null, error);
-    }
+export async function initAuth() {
+  if (!gapi) {
+    throw new Error('Google API SDK is not loaded.');
   }
+
+  await new Promise((resolve, reject) => {
+    gapi.load('client:auth2', {
+      callback: async () => {
+        resolve();
+      },
+      onerror: () => {
+        reject('Could not load gapi.client.');
+      },
+    });
+  });
+
+  await gapi.client.init(initConfig);
+  const user = gapi.auth2.getAuthInstance().currentUser.get();
+  console.log('Google API initialized. user=', user);
+  return user;
 }
 
 export async function signIn() {
