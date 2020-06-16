@@ -1,3 +1,9 @@
+# Google Auth React Example
+
+<img src="./public/screen1.png" alt="Screen Shot 1" width="388"/>
+
+<img src="./public/screen2.png" alt="Screen Shot 2" width="150"/>
+
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Available Scripts
